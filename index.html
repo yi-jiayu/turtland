@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Turtland</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+</body>
+<script>
+  const canvas = document.createElement('canvas');
+  canvas.id = 'canvas';
+  canvas.height = window.innerHeight;
+  canvas.width = window.innerWidth;
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const image = new Image(240, 240);
+  image.src = '240px-387Turtwig.png';
+
+
+  let turtX = 100;
+  let turtY = 100;
+  let turtVx = 0;
+  let turtVy = 0;
+
+  function step() {
+    turtX = turtX + turtVx;
+    turtY = turtY + turtVy;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, turtX, turtY);
+  }
+
+  image.onload = () => {
+    window.addEventListener('keydown', (e) => {
+      switch (e.code) {
+        case 'KeyD':
+          turtVx = 1;
+          break;
+        case 'KeyA':
+          turtVx = -1;
+          break;
+        case 'KeyW':
+          turtVy = -1;
+          break;
+        case 'KeyS':
+          turtVy = 1;
+          break;
+      }
+      window.addEventListener('keyup', (e) => {
+        switch (e.code) {
+          case 'KeyD':
+          case 'KeyA':
+            turtVx = 0
+            break;
+          case 'KeyW':
+          case 'KeyS':
+            turtVy = 0;
+            break;
+        }
+      });
+
+      setInterval(() => {
+        step();
+        draw();
+      }, 100);
+    });
+  }
+</script>
+</html>
