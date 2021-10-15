@@ -5,7 +5,7 @@ let population = 0;
 const sockets = new Map();
 
 const IMPULSE = 1;
-const FRICTION = 10;
+const FRICTION = 0.05;
 const TIME_STEP = 10;
 
 const server = new Server();
@@ -46,8 +46,8 @@ setInterval(() => {
       y: y + vy,
       vx: vx + ax,
       vy: vy + ay,
-      ax: ax - FRICTION > 0 ? ax - FRICTION : 0,
-      ay: ay - FRICTION > 0 ? ay - FRICTION : 0,
+      ax: Math.abs(vx) > 0 ? -1 * Math.sign(vx) * FRICTION : 0,
+      ay: Math.abs(vy) > 0 ? -1 * Math.sign(vy) * FRICTION : 0,
     }
   }
 }, TIME_STEP);
