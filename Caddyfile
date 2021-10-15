@@ -1,0 +1,4 @@
+:8080
+
+reverse_proxy /socket.io* :3000
+file_server

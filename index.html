@@ -3,86 +3,104 @@
 <head>
   <meta charset="UTF-8">
   <title>Turtland</title>
-
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-    }
-
-    canvas {
-      display: block;
-    }
-  </style>
+  <script src="https://pixijs.download/v6.1.3/pixi.js"></script>
 </head>
 <body>
-</body>
+<script src="https://cdn.socket.io/4.2.0/socket.io.min.js"
+        integrity="sha384-PiBR5S00EtOj2Lto9Uu81cmoyZqR57XcOna1oAuVuIEjzj0wpqDVfD0JA9eXlRsj"
+        crossorigin="anonymous"></script>
 <script>
-  const canvas = document.createElement('canvas');
-  canvas.id = 'canvas';
-  canvas.height = window.innerHeight;
-  canvas.width = window.innerWidth;
-  document.body.appendChild(canvas);
+  window.world = {};
+  window.tick = 0;
 
-  const ctx = canvas.getContext('2d');
-  const image = new Image(240, 240);
-  image.src = '240px-387Turtwig.png';
-
-
-  let turtX = 100;
-  let turtY = 100;
-  let turtVx = 0;
-  let turtVy = 0;
-
-  function step() {
-    turtX = turtX + turtVx;
-    turtY = turtY + turtVy;
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, turtX, turtY);
-  }
-
-  image.onload = () => {
-    window.addEventListener('keydown', (e) => {
-      switch (e.code) {
-        case 'KeyD':
-          turtVx = 1;
-          break;
-        case 'KeyA':
-          turtVx = -1;
-          break;
-        case 'KeyW':
-          turtVy = -1;
-          break;
-        case 'KeyS':
-          turtVy = 1;
-          break;
+  const pressed = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+  };
+  window.addEventListener('keydown', e => {
+    switch (e.code) {
+      case 'KeyD':
+        pressed.right = true;
+        break;
+      case 'KeyA':
+        pressed.left = true;
+        break;
+      case 'KeyW':
+        pressed.up = true;
+        break;
+      case 'KeyS':
+        pressed.down = true;
+        break;
+    }
+  });
+  window.addEventListener('keyup', e => {
+    switch (e.code) {
+      case 'KeyD':
+        pressed.right = false;
+        break;
+      case 'KeyA':
+        pressed.left = false;
+        break;
+      case 'KeyW':
+        pressed.up = false;
+        break;
+      case 'KeyS':
+        pressed.down = false;
+        break;
+    }
+  });
+  let handle;
+  const socket = io();
+  socket.on('connect', () => {
+    handle = setInterval(() => {
+      if (pressed.up || pressed.down || pressed.left || pressed.right) {
+        socket.send(pressed);
       }
-      window.addEventListener('keyup', (e) => {
-        switch (e.code) {
-          case 'KeyD':
-          case 'KeyA':
-            turtVx = 0
-            break;
-          case 'KeyW':
-          case 'KeyS':
-            turtVy = 0;
-            break;
-        }
-      });
+    }, 100);
+  });
+  socket.on('message', s => {
+    const data = JSON.parse(s);
+    window.tick = data.tick;
+    window.world = data.world;
+  })
+  socket.on('disconnect', () => {
+    clearInterval(handle);
+  });
 
-      setInterval(() => {
-        step();
-        draw();
-      }, 100);
-    });
+  let app = new PIXI.Application({width: 800, height: 600});
+  document.body.appendChild(app.view);
+
+  let texture = PIXI.Texture.from('turtwig.png');
+  let lastRendered = 0;
+  const sprites = {};
+
+  function render(world) {
+    for (let [id, {x, y}] of Object.entries(world)) {
+      let sprite = sprites[id];
+      if (!sprite) {
+        sprite = new PIXI.Sprite(texture);
+        app.stage.addChild(sprite);
+        sprites[id] = sprite;
+      }
+      sprite.x = x;
+      sprite.y = y;
+    }
+    for (let [id, sprite] of Object.entries(sprites)) {
+      if (!world.hasOwnProperty(id)) {
+        app.stage.removeChild(sprite);
+        delete sprites[id];
+      }
+    }
   }
+
+  app.ticker.add((delta) => {
+    if (lastRendered !== tick) {
+      render(world);
+      lastRendered = tick;
+    }
+  });
 </script>
+</body>
 </html>
