@@ -32,6 +32,7 @@ server.on('connection', socket => {
 
   socket.on('disconnect', () => {
     population--;
+    delete world[socket.id];
     sockets.delete(socket.id);
     console.log(`${socket.id} disconnected (total: ${population})`)
   });
