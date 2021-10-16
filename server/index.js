@@ -4,24 +4,29 @@ const world = {};
 let population = 0;
 const sockets = new Map();
 
-const IMPULSE = 10000;
-const FRICTION = 1000;
-const TIME_STEP = 30;
+const IMPULSE = 15000;
+const JUMP_IMPULSE = -1000;
+const FRICTION = 1500;
+const g = 5000;
+const GROUND_LEVEL = 200
+const TIME_STEP = 10;
 const TIME_STEP_S = TIME_STEP * 0.001;
 
 const server = new Server();
 server.on('connection', socket => {
-  world[socket.id] = {x: 100, y: 100, vx: 0, vy: 0, ax_input: 0, ay_input: 0};
+  world[socket.id] = {x: 100, y: -100, vx: 0, vy: 0, ax_input: 0};
   population++;
   sockets.set(socket.id, socket);
   console.log(`${socket.id} connected (total: ${population})`);
 
   socket.on('message', pressed => {
     if (pressed.up) {
-      world[socket.id].ay_input = -IMPULSE;
+      if (isOnGround(socket.id)) {
+        world[socket.id].vy += JUMP_IMPULSE;
+      }
     }
     if (pressed.down) {
-      world[socket.id].ay_input = IMPULSE;
+      // world[socket.id].ay_input = IMPULSE;
     }
     if (pressed.left) {
       world[socket.id].ax_input = -IMPULSE;
@@ -41,18 +46,31 @@ server.on('connection', socket => {
 // update loop
 setInterval(() => {
   for (const [key, value] of Object.entries(world)) {
-    const {x, y, vx, vy, ax_input, ay_input} = value;
+    let {x, y, vx, vy, ax_input} = value;
+    let ax = 0, ay = 0;
 
-    const ax = ax_input + -1 * Math.sign(vx) * FRICTION;
-    const ay = ay_input + -1 * Math.sign(vy) * FRICTION;
+    ax += ax_input;
+    if (isOnGround) {
+      ax += -1 * Math.sign(vx) * FRICTION;
+    }
+    ay += g;
+
+    x += vx * TIME_STEP_S;
+    y += vy * TIME_STEP_S;
+    if (y >= GROUND_LEVEL) {
+      y = GROUND_LEVEL;
+      vy = 0;
+      ay = 0;
+    }
+    vx += ax * TIME_STEP_S;
+    vy += ay * TIME_STEP_S;
 
     world[key] = {
-      x: x + (vx * TIME_STEP_S),
-      y: y + (vy * TIME_STEP_S),
-      vx: vx + (ax * TIME_STEP_S),
-      vy: vy + (ay * TIME_STEP_S),
+      x: x,
+      y: y,
+      vx: vx,
+      vy: vy,
       ax_input: 0,
-      ay_input: 0,
     }
   }
 }, TIME_STEP);
@@ -67,3 +85,10 @@ setInterval(() => {
   }
 }, 1000/60);
 server.listen(3000);
+
+function isOnGround(id) {
+  if (world[id].y == GROUND_LEVEL) {
+    return true;
+  }
+  return false;
+}
