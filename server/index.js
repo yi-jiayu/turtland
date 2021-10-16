@@ -4,29 +4,30 @@ const world = {};
 let population = 0;
 const sockets = new Map();
 
-const IMPULSE = 1;
-const FRICTION = 0.05;
-const TIME_STEP = 10;
+const IMPULSE = 10000;
+const FRICTION = 1000;
+const TIME_STEP = 30;
+const TIME_STEP_S = TIME_STEP * 0.001;
 
 const server = new Server();
 server.on('connection', socket => {
-  world[socket.id] = {x: 100, y: 100, vx: 0, vy: 0, ax: 0, ay: 0};
+  world[socket.id] = {x: 100, y: 100, vx: 0, vy: 0, ax_input: 0, ay_input: 0};
   population++;
   sockets.set(socket.id, socket);
   console.log(`${socket.id} connected (total: ${population})`);
 
   socket.on('message', pressed => {
     if (pressed.up) {
-      world[socket.id].ay = -IMPULSE;
+      world[socket.id].ay_input = -IMPULSE;
     }
     if (pressed.down) {
-      world[socket.id].ay = IMPULSE;
+      world[socket.id].ay_input = IMPULSE;
     }
     if (pressed.left) {
-      world[socket.id].ax = -IMPULSE;
+      world[socket.id].ax_input = -IMPULSE;
     }
     if (pressed.right) {
-      world[socket.id].ax = IMPULSE;
+      world[socket.id].ax_input = IMPULSE;
     }
   })
 
@@ -40,14 +41,18 @@ server.on('connection', socket => {
 // update loop
 setInterval(() => {
   for (const [key, value] of Object.entries(world)) {
-    const {x, y, vx, vy, ax, ay} = value;
+    const {x, y, vx, vy, ax_input, ay_input} = value;
+
+    const ax = ax_input + -1 * Math.sign(vx) * FRICTION;
+    const ay = ay_input + -1 * Math.sign(vy) * FRICTION;
+
     world[key] = {
-      x: x + vx,
-      y: y + vy,
-      vx: vx + ax,
-      vy: vy + ay,
-      ax: Math.abs(vx) > 0 ? -1 * Math.sign(vx) * FRICTION : 0,
-      ay: Math.abs(vy) > 0 ? -1 * Math.sign(vy) * FRICTION : 0,
+      x: x + (vx * TIME_STEP_S),
+      y: y + (vy * TIME_STEP_S),
+      vx: vx + (ax * TIME_STEP_S),
+      vy: vy + (ay * TIME_STEP_S),
+      ax_input: 0,
+      ay_input: 0,
     }
   }
 }, TIME_STEP);
@@ -60,5 +65,5 @@ setInterval(() => {
     });
     sockets.forEach(socket => socket.send(data));
   }
-}, 100);
+}, 1000/60);
 server.listen(3000);
