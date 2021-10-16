@@ -71,6 +71,13 @@
 
   let app = new PIXI.Application({width: 800, height: 600});
   document.body.appendChild(app.view);
+  let ground = new PIXI.Graphics();
+  ground.beginFill(0xFFFF00);
+  ground.lineStyle(5, 0xFF0000);
+  ground.drawRect(0, 550, 800, 50);
+  ground.drawRect(0, 350, 400, 50);
+  ground.drawRect(400, 150, 400, 50);
+  app.stage.addChild(ground);
 
   let texture = PIXI.Texture.from('turtwig.png');
   let lastRendered = 0;
