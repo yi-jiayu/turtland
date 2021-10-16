@@ -1,15 +1,11 @@
 import {Server} from 'socket.io';
 import fs from 'fs';
 import bmp from 'bmp-js';
+import { dir } from 'console';
 
 const world = {};
 let population = 0;
 const sockets = new Map();
-const platforms = [
-  [0, 550, 800, 15],
-  [50, 350, 300, 15],
-  [450, 150, 300, 15],
-];
 
 const bmpBuffer = fs.readFileSync('map.bmp');
 const bmpData = bmp.decode(bmpBuffer);
@@ -18,7 +14,7 @@ const background_width = bmpData['width'], background_height = bmpData['height']
 
 let terrain = Array(background_height).fill().map(()=>Array(background_width).fill());
 for (var i = 0; i < background_width*background_height; i++) {
-  if (Math.max(bmpData['data'][(i*4)+1], bmpData['data'][(i*4)+2], bmpData['data'][(i*4)+3]) < 200) {
+  if (pixelIsTerrain(bmpData['data'][(i*4)], bmpData['data'][(i*4)+1], bmpData['data'][(i*4)+2], bmpData['data'][(i*4)+3])) {
     terrain[Math.floor(i/background_width)][i%background_width] = true;
   } else {
     terrain[Math.floor(i/background_width)][i%background_width] = false;
@@ -42,10 +38,10 @@ for (var i = 0; i < background_width*background_height; i++) {
 
 const HORIZONTAL_ACCELERATION = {grounded: 50000, in_air: 2000};
 const JUMP_IMPULSE = -1500;
-const FRICTION = 3000;
+const FRICTION = 5000;
 const g = 5000;
 const RESPAWN_HEIGHT = 800;
-const SPAWN = {x: 400, y: -100, vx: 0, vy: 0, ax_input: 0, grounded: false};
+const SPAWN = {direction: 1, x: 400, y: -100, vx: 0, vy: 0, ax_input: 0, grounded: false};
 const MIN_HORIZONTAL_VELOCITY = 50;
 const MAX_HORIZONTAL_VELOCITY = 500;
 const TERIMAL_VELOCITY = 1500;
@@ -67,7 +63,6 @@ server.on('connection', socket => {
       }
     }
     if (pressed.down) {
-      // world[socket.id].ay_input = IMPULSE;
     }
     if (pressed.left) {
       world[socket.id].ax_input = -1;
@@ -87,8 +82,10 @@ server.on('connection', socket => {
 // update loop
 setInterval(() => {
   for (const [key, value] of Object.entries(world)) {
-    let {x, y, vx, vy, ax_input, grounded} = value;
+    let {direction, x, y, vx, vy, ax_input, grounded} = value;
     let ax = 0, ay = 0;
+
+    direction = Math.sign(ax_input) == 0 ? direction : Math.sign(ax_input);
 
     if (grounded) {
       ax += ax_input * HORIZONTAL_ACCELERATION.grounded + -1 * Math.sign(vx) * FRICTION;
@@ -98,17 +95,19 @@ setInterval(() => {
 
     ay += g;
 
+
+
     x += vx * TIME_STEP_S;
     y += vy * TIME_STEP_S;
 
-    const [isOnPlatform, platform_level] = onPlatform(x, y);
-    if (vy >= 0 && isOnPlatform) {
+    const [isInPlatform, platform_level] = terrainCheck(x, y);
+    if (vy >= 0 && isInPlatform) {
       y = platform_level;
       grounded = true;
     }
     
     if (grounded) {
-        if (!isOnPlatform) {
+        if (!isInPlatform) {
           grounded = false;
         }
         vy = 0;
@@ -127,6 +126,7 @@ setInterval(() => {
     }
 
     world[key] = {
+      direction: direction,
       x: x,
       y: y,
       vx: vx,
@@ -148,7 +148,19 @@ setInterval(() => {
 }, 1000/60);
 server.listen(3000);
 
-function onPlatform(x, y) {
+function pixelIsTerrain(a, r, g, b) {
+  if (a < 50) {
+    return false;
+  } else {
+    if (Math.max(r, g, b) < 50) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+
+function terrainCheck(x, y) {
   x = Math.floor(x);
   y = Math.floor(y);
   if (y < 0 || y >= background_height || x < 0 || x >= background_width) {

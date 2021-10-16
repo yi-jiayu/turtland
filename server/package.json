@@ -7,7 +7,6 @@
     "bmp-js": "^0.1.0",
     "matter-js": "^0.17.1",
     "nodemon": "^2.0.13",
-    "png-js": "^1.0.0",
     "socket.io": "^4.3.0"
   },
   "type": "module",
