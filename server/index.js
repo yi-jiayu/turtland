@@ -1,13 +1,44 @@
 import {Server} from 'socket.io';
+import fs from 'fs';
+import bmp from 'bmp-js';
 
 const world = {};
 let population = 0;
 const sockets = new Map();
 const platforms = [
-  [0, 550, 800, 50],
-  [0, 350, 400, 50],
-  [400, 150, 400, 50],
+  [0, 550, 800, 15],
+  [50, 350, 300, 15],
+  [450, 150, 300, 15],
 ];
+
+const bmpBuffer = fs.readFileSync('map.bmp');
+const bmpData = bmp.decode(bmpBuffer);
+
+const background_width = bmpData['width'], background_height = bmpData['height'];
+
+let terrain = Array(background_height).fill().map(()=>Array(background_width).fill());
+for (var i = 0; i < background_width*background_height; i++) {
+  if (Math.max(bmpData['data'][(i*4)+1], bmpData['data'][(i*4)+2], bmpData['data'][(i*4)+3]) < 200) {
+    terrain[Math.floor(i/background_width)][i%background_width] = true;
+  } else {
+    terrain[Math.floor(i/background_width)][i%background_width] = false;
+  }
+}
+
+// let terrain_log = "";
+// for (var i = 0; i < background_height; i++) {
+//   for (var j = 0; j < background_width; j++) {
+//     if (terrain[i][j]) {
+//       terrain_log += 'x';
+//     } else {
+//       terrain_log += ' ';
+//     }
+//   }
+//   terrain_log += '\n';
+// }
+// fs.writeFile('log.txt', terrain_log, function (err) {
+//   if (err) return console.log(err);
+// });
 
 const HORIZONTAL_ACCELERATION = {grounded: 50000, in_air: 2000};
 const JUMP_IMPULSE = -1500;
@@ -17,6 +48,7 @@ const RESPAWN_HEIGHT = 800;
 const SPAWN = {x: 400, y: -100, vx: 0, vy: 0, ax_input: 0, grounded: false};
 const MIN_HORIZONTAL_VELOCITY = 50;
 const MAX_HORIZONTAL_VELOCITY = 500;
+const TERIMAL_VELOCITY = 1500;
 const TIME_STEP = 10;
 const TIME_STEP_S = TIME_STEP * 0.001;
 
@@ -69,14 +101,14 @@ setInterval(() => {
     x += vx * TIME_STEP_S;
     y += vy * TIME_STEP_S;
 
-    const platform_level = onPlatform(x, y);
-    if (vy >= 0 && platform_level) {
+    const [isOnPlatform, platform_level] = onPlatform(x, y);
+    if (vy >= 0 && isOnPlatform) {
       y = platform_level;
       grounded = true;
     }
     
     if (grounded) {
-        if (!platform_level) {
+        if (!isOnPlatform) {
           grounded = false;
         }
         vy = 0;
@@ -87,6 +119,7 @@ setInterval(() => {
     vx = Math.abs(vx) < MIN_HORIZONTAL_VELOCITY ? 0 : vx;
     vx = Math.abs(vx) > MAX_HORIZONTAL_VELOCITY ? Math.sign(vx) * MAX_HORIZONTAL_VELOCITY : vx;
     vy += ay * TIME_STEP_S;
+    vy = vy > TERIMAL_VELOCITY ? TERIMAL_VELOCITY : vy;
 
     if (y >= RESPAWN_HEIGHT) {
       world[key] = SPAWN;
@@ -116,11 +149,21 @@ setInterval(() => {
 server.listen(3000);
 
 function onPlatform(x, y) {
-  for (var i = 0; i < platforms.length; i++) {
-    const platform = platforms[i];
-    if (x >= platform[0] && x <= platform[0] + platform[2] && y >= platform[1] && y <= platform[1] + platform[3]) {
-      return platform[1];
-    }
+  x = Math.floor(x);
+  y = Math.floor(y);
+  if (y < 0 || y >= background_height || x < 0 || x >= background_width) {
+    return [false, 0];
   }
-  return null;
+  
+  if (terrain[y][x]) {
+    let ground_level = y - 1;
+    while (terrain[ground_level][x]) {
+      ground_level -= 1;
+      if (ground_level == 0) {
+        return [true, -1];
+      }
+    }
+    return [true, ground_level + 1];
+  }
+  return [false, 0];
 }
