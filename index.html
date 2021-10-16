@@ -84,8 +84,8 @@
         app.stage.addChild(sprite);
         sprites[id] = sprite;
       }
-      sprite.x = x;
-      sprite.y = y;
+      sprite.x = x - sprite.width/2;
+      sprite.y = y - sprite.height;
     }
     for (let [id, sprite] of Object.entries(sprites)) {
       if (!world.hasOwnProperty(id)) {

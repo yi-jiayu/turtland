@@ -8,13 +8,13 @@ const IMPULSE = 15000;
 const JUMP_IMPULSE = -1000;
 const FRICTION = 1500;
 const g = 5000;
-const GROUND_LEVEL = 200
+const GROUND_LEVEL = 600
 const TIME_STEP = 10;
 const TIME_STEP_S = TIME_STEP * 0.001;
 
 const server = new Server();
 server.on('connection', socket => {
-  world[socket.id] = {x: 100, y: -100, vx: 0, vy: 0, ax_input: 0};
+  world[socket.id] = {x: 400, y: -100, vx: 0, vy: 0, ax_input: 0};
   population++;
   sockets.set(socket.id, socket);
   console.log(`${socket.id} connected (total: ${population})`);
