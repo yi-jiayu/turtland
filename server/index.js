@@ -1,40 +1,13 @@
 import {Server} from 'socket.io';
 import fs from 'fs';
 import bmp from 'bmp-js';
-import { dir } from 'console';
 
 const world = {};
 let population = 0;
 const sockets = new Map();
 
-const bmpBuffer = fs.readFileSync('map.bmp');
-const bmpData = bmp.decode(bmpBuffer);
-
-const background_width = bmpData['width'], background_height = bmpData['height'];
-
-let terrain = Array(background_height).fill().map(()=>Array(background_width).fill());
-for (var i = 0; i < background_width*background_height; i++) {
-  if (pixelIsTerrain(bmpData['data'][(i*4)], bmpData['data'][(i*4)+1], bmpData['data'][(i*4)+2], bmpData['data'][(i*4)+3])) {
-    terrain[Math.floor(i/background_width)][i%background_width] = true;
-  } else {
-    terrain[Math.floor(i/background_width)][i%background_width] = false;
-  }
-}
-
-// let terrain_log = "";
-// for (var i = 0; i < background_height; i++) {
-//   for (var j = 0; j < background_width; j++) {
-//     if (terrain[i][j]) {
-//       terrain_log += 'x';
-//     } else {
-//       terrain_log += ' ';
-//     }
-//   }
-//   terrain_log += '\n';
-// }
-// fs.writeFile('log.txt', terrain_log, function (err) {
-//   if (err) return console.log(err);
-// });
+const {terrain, background_width, background_height} = loadMapFromFile('map.bmp');
+generateTerrainLog(terrain);
 
 const HORIZONTAL_ACCELERATION = {grounded: 50000, in_air: 2000};
 const JUMP_IMPULSE = -1500;
@@ -45,8 +18,8 @@ const SPAWN = {direction: 1, x: 400, y: -100, vx: 0, vy: 0, ax_input: 0, grounde
 const MIN_HORIZONTAL_VELOCITY = 50;
 const MAX_HORIZONTAL_VELOCITY = 500;
 const TERIMAL_VELOCITY = 1500;
-const TIME_STEP = 10;
-const TIME_STEP_S = TIME_STEP * 0.001;
+const TIME_STEP_MS = 10;
+const TIME_STEP_S = TIME_STEP_MS * 0.001;
 
 const server = new Server();
 server.on('connection', socket => {
@@ -82,6 +55,23 @@ server.on('connection', socket => {
 // update loop
 setInterval(() => {
   for (const [key, value] of Object.entries(world)) {
+    /*
+    1) Calculate accelerations from sum of accelerations (forces assuming unit mass).
+      a) If the object is in contact with the ground, it experiences a normal force which counteracts gravity, i.e. vertical
+      acceleration is 0. In addition, the normal force causes friction to be felt only when grounded.
+      If object is not in contact with ground, it does not experience friction and has a different value of horizontal
+      acceleration. 
+    2) Calculate new position by integrating velocity wrt. time.
+      a) Check if position has fallen out of the map. If so, set everything back to spawn and return from function.
+      b) Check if position collides with terrain. If so, snap to outside of terrain and reset velocity and acceleration
+      to prevent it from entering the terrain in the next loop.
+    3) Calculate new velocites from acceleration.
+      a) Set horizontal velocity to zero if below the minimum value to prevent drifting.
+      b) Set horizontal velocity to limit if above the maximum value to prevent runaway acceleration.
+      c) Set vertical velocity to terminal velocity if above the maximum value to prevent runaway acceleration.
+    4) Update object properties and reset input to none.
+    */
+
     let {direction, x, y, vx, vy, ax_input, grounded} = value;
     let ax = 0, ay = 0;
 
@@ -89,16 +79,20 @@ setInterval(() => {
 
     if (grounded) {
       ax += ax_input * HORIZONTAL_ACCELERATION.grounded + -1 * Math.sign(vx) * FRICTION;
+      ay += 0;
     } else {
       ax += ax_input * HORIZONTAL_ACCELERATION.in_air;
+      ay += g;
     }
-
-    ay += g;
-
 
 
     x += vx * TIME_STEP_S;
     y += vy * TIME_STEP_S;
+
+    if (y >= RESPAWN_HEIGHT) {
+      world[key] = SPAWN;
+      return;
+    }
 
     const [isInPlatform, platform_level] = terrainCheck(x, y);
     if (vy >= 0 && isInPlatform) {
@@ -111,7 +105,6 @@ setInterval(() => {
           grounded = false;
         }
         vy = 0;
-        ay = 0;
     }
 
     vx += ax * TIME_STEP_S;
@@ -119,11 +112,6 @@ setInterval(() => {
     vx = Math.abs(vx) > MAX_HORIZONTAL_VELOCITY ? Math.sign(vx) * MAX_HORIZONTAL_VELOCITY : vx;
     vy += ay * TIME_STEP_S;
     vy = vy > TERIMAL_VELOCITY ? TERIMAL_VELOCITY : vy;
-
-    if (y >= RESPAWN_HEIGHT) {
-      world[key] = SPAWN;
-      return;
-    }
 
     world[key] = {
       direction: direction,
@@ -135,7 +123,7 @@ setInterval(() => {
       grounded: grounded
     }
   }
-}, TIME_STEP);
+}, TIME_STEP_MS);
 // broadcast loop
 setInterval(() => {
   if (sockets.size) {
@@ -158,6 +146,49 @@ function pixelIsTerrain(a, r, g, b) {
       return false;
     }
   }
+}
+
+function loadMapFromFile(filepath) {
+  const bmpBuffer = fs.readFileSync(filepath);
+  const bmpData = bmp.decode(bmpBuffer);
+
+  const background_width = bmpData['width'], background_height = bmpData['height'];
+
+  const terrain = Array(background_height).fill().map(()=>Array(background_width).fill());
+  for (var i = 0; i < background_width*background_height; i++) {
+    if (pixelIsTerrain(bmpData['data'][(i*4)], bmpData['data'][(i*4)+1], bmpData['data'][(i*4)+2], bmpData['data'][(i*4)+3])) {
+      terrain[Math.floor(i/background_width)][i%background_width] = true;
+    } else {
+      terrain[Math.floor(i/background_width)][i%background_width] = false;
+    }
+  }
+
+  return {
+    terrain: terrain,
+    background_width: background_width,
+    background_height: background_height,
+  };
+}
+
+function generateTerrainLog(terrain) {
+  let terrain_log = "";
+  for (var i = 0; i < terrain.length; i++) {
+    const row = terrain[i];
+    for (var j = 0; j < row.length; j++) {
+      if (terrain[i][j]) {
+        terrain_log += 'x';
+      } else {
+        terrain_log += ' ';
+      }
+    }
+    if (i == terrain.length -1) {
+      break
+    }
+    terrain_log += '\n';
+  }
+  fs.writeFile('log.txt', terrain_log, function (err) {
+    if (err) return console.log(err);
+  });
 }
 
 function terrainCheck(x, y) {
