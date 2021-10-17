@@ -71,21 +71,27 @@
 
   let app = new PIXI.Application({width: 800, height: 600});
   document.body.appendChild(app.view);
+  let texture = PIXI.Texture.from('map.png');
+  let terrain = new PIXI.Sprite(texture);
+  app.stage.addChild(terrain);
 
-  let texture = PIXI.Texture.from('turtwig.png');
+  texture = PIXI.Texture.from('turtwig.png');
   let lastRendered = 0;
   const sprites = {};
 
   function render(world) {
-    for (let [id, {x, y}] of Object.entries(world)) {
+    for (let [id, {direction, x, y}] of Object.entries(world)) {
       let sprite = sprites[id];
       if (!sprite) {
         sprite = new PIXI.Sprite(texture);
         app.stage.addChild(sprite);
         sprites[id] = sprite;
       }
+      sprite.anchor.x = 0.5;
+      sprite.anchor.y = 1;
       sprite.x = x;
       sprite.y = y;
+      sprite.scale.x = direction;
     }
     for (let [id, sprite] of Object.entries(sprites)) {
       if (!world.hasOwnProperty(id)) {
