@@ -4,6 +4,20 @@
   <meta charset="UTF-8">
   <title>Turtland</title>
   <script src="https://pixijs.download/v6.1.3/pixi.js"></script>
+  <style>
+    .block--grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      width: 600px;
+    }
+
+    .button {
+      width: 200px;
+      padding: 30px;
+      font-size: 30px;
+    }
+  </style>
 </head>
 <body>
 <script src="https://cdn.socket.io/4.2.0/socket.io.min.js"
@@ -106,6 +120,30 @@
       render(world);
       lastRendered = tick;
     }
+  });
+</script>
+<div class="block--grid">
+  <span></span> <!-- placeholder -->
+  <button id="movekey--up" class="button">W</button>
+  <span></span> <!-- placeholder -->
+
+  <button id="movekey--left" class="button">A</button>
+  <button id="movekey--down" class="button">S</button>
+  <button id="movekey--right" class="button">D</button>
+</div>
+
+<script>
+  document.getElementById("movekey--up").addEventListener("click", function() {
+    pressed.up = true;
+  });
+  document.getElementById("movekey--left").addEventListener("click", function() {
+    pressed.left = true;
+  });
+  document.getElementById("movekey--down").addEventListener("click", function() {
+    pressed.down = true;
+  });
+  document.getElementById("movekey--right").addEventListener("click", function() {
+    pressed.right = true;
   });
 </script>
 </body>
